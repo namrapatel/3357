@@ -1,4 +1,5 @@
 import socket
+
 from sys import argv
 import selectors
 import argparse
@@ -18,20 +19,27 @@ def main(path, username):
     clientSocket.send(username.encode())
     sel.register(clientSocket,selectors.EVENT_READ | selectors.EVENT_WRITE,)
 
-
     print("Registration successful. Ready for Messaging!")
     while True:
+        print("here")
         sentence = input()
-        events = sel.select(timeout=None)
+        print("here2")
+        events = sel.select(timeout=10)
+        print(events)
+        print("here3")
         for key, mask in events:
+            print(mask)
             if mask & selectors.EVENT_READ:
+                print("read")
                 modifiedSentence = clientSocket.recv(1024)
                 print("From Server: ", modifiedSentence.decode())
             if mask & selectors.EVENT_WRITE:
                 if not sentence:
                     sel.modify(clientSocket,selectors.EVENT_READ)
                 else:
+                    print("WRITE MODE")
                     clientSocket.send(sentence.encode())
+                    sel.modify(clientSocket,selectors.EVENT_READ)
         #modifiedSentence = clientSocket.recv(1024)
         #print("From Server: ", modifiedSentence.decode())
         if(sentence=='quit'): break;

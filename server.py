@@ -58,8 +58,8 @@ def main():
             #callback(key.fileobj, mask)
             if key.data is None:
                accept(key.fileobj,mask)
-           # else:
-                #service_connection(key, mask)
+            else:
+               read(key.fileobj, mask)
 
 
 if __name__ == '__main__':
