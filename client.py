@@ -19,16 +19,24 @@ def main(path, username):
 
     print("Registration successful. Ready for Messaging!")
     while True:
-        print("here")
-        sentence = input()
-        clientSocket.setblocking(False)
-        clientSocket.send(sentence.encode())
-        modifiedSentence = clientSocket.recv(1024)
-        print("From Server: ", modifiedSentence.decode())
-        #modifiedSentence = clientSocket.recv(1024)
-        #print("From Server: ", modifiedSentence.decode())
-        #if(sentence=='quit'): break;
-    clientSocket.close()
+        try:
+            while True:
+                sentence = input()
+                clientSocket.setblocking(False)
+                clientSocket.send(sentence.encode())
+                print("sent")
+                modifiedSentence = clientSocket.recv(1024)
+                print("From Server: ", modifiedSentence.decode())
+                #if(sentence=='quit'): break;
+
+        except IOError as e:
+            print("error")
+            continue
+
+        except Exception as e:
+            # Other exceptiopns are handled here
+            print('Reading error: '.format(str(e)))
+            sys.exit()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Chat Client')

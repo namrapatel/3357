@@ -11,7 +11,6 @@ users = []
 def accept(sock,mask):
     conn, address = sock.accept()
     sockets.append(conn)
-    #print(sockets)
     print("Accepted connection from client Address: ", address )
     sockets.append(conn)
     conn.setblocking(False)
@@ -25,19 +24,25 @@ def accept(sock,mask):
         print('closing', conn)
         sel.unregister(conn)
         conn.close()
-    #print(sockets)
-    #data = types.SimpleNamespace(addr=addr, inb=b'', outb=b'')
     sel.register(conn, selectors.EVENT_READ, read)
 
 def read(conn, mask):
     data = conn.recv(1024)  
     if data:
         print(data.decode())
-        conn.sendall(data)  
+        #conn.sendall(data) 
+        broadcast(conn,data.decode()) 
     else:
         print('closing', conn)
         sel.unregister(conn)
         conn.close()
+
+def broadcast(conn, message):
+    message = message.encode()
+    for socket in sockets:
+        if socket != conn:
+            socket.send(message)
+
 
 def main():
 
