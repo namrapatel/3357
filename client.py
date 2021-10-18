@@ -29,9 +29,8 @@ def main(path, username):
                 print("From Server: ", modifiedSentence.decode())
                 #if(sentence=='quit'): break;
 
-        except IOError as e:
-            print("error")
-            continue
+        except BlockingIOError as e:
+            pass
 
         except Exception as e:
             # Other exceptiopns are handled here
