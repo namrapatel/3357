@@ -1,10 +1,11 @@
 import socket
-from sys import argv
+import sys
 import selectors
 import argparse
 from urllib.parse import urlparse
 
 sel = selectors.DefaultSelector()
+registeredError = "401 Client already registered"
 
 def main(path, username):
     url = urlparse(path)
@@ -27,14 +28,17 @@ def main(path, username):
                 print("sent")
                 modifiedSentence = clientSocket.recv(1024)
                 print("From Server: ", modifiedSentence.decode())
-                #if(sentence=='quit'): break;
+                print(modifiedSentence.decode().find(registeredError))
+                if (modifiedSentence.decode().find(registeredError) != -1):
+                    raise Exception
 
         except BlockingIOError as e:
             pass
 
         except Exception as e:
-            # Other exceptiopns are handled here
-            print('Reading error: '.format(str(e)))
+            print(e)
+            if (e==0):
+                print("401 Client already registered")
             sys.exit()
 
 if __name__ == '__main__':

@@ -6,25 +6,29 @@ import argparse
 
 sel = selectors.DefaultSelector()
 sockets = []
-users = []
+userList = []
 
 def accept(sock,mask):
     conn, address = sock.accept()
     sockets.append(conn)
-    print("Accepted connection from client Address: ", address )
-    sockets.append(conn)
+    print("Accepted connection from client address: ", address )
     conn.setblocking(False)
     data = conn.recv(1024)  
     if data:
         data=data.decode()
-        users.append(data)
-        print(users)
+        # check if username exists in userList
+        if data in userList:
+            sendError(conn, "401 Client already registered")
+            return
+        userList.append(data)
+        print("Added user: ", data)
         print("Connection to client established, waiting to recive messages from user: ",data)
     else:
         print('closing', conn)
         sel.unregister(conn)
         conn.close()
     sel.register(conn, selectors.EVENT_READ, read)
+    print(userList)
 
 def read(conn, mask):
     data = conn.recv(1024)  
@@ -43,6 +47,11 @@ def broadcast(conn, message):
         if socket != conn:
             socket.send(message)
 
+def sendError(conn, message):
+    message = message.encode()
+    for socket in sockets:
+        if socket == conn:
+            socket.send(message)
 
 def main():
 
@@ -57,14 +66,19 @@ def main():
 
 
     while True:
-        events = sel.select(timeout=None)
-        for key, mask in events:
-            #callback = key.data
-            #callback(key.fileobj, mask)
-            if key.data is None:
-               accept(key.fileobj,mask)
-            else:
-               read(key.fileobj, mask)
+        try: 
+            events = sel.select(timeout=None)
+            for key, mask in events:
+                #callback = key.data
+                #callback(key.fileobj, mask)
+                if key.data is None:
+                    accept(key.fileobj,mask)
+                else:
+                    read(key.fileobj, mask)
+        except BlockingIOError as e:
+            pass
+        except Exception as e:
+            print(e)
 
 
 if __name__ == '__main__':
