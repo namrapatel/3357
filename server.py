@@ -1,5 +1,4 @@
-
-rt socket
+import socket
 import select
 
 HEADER_LENGTH = 10
@@ -139,3 +138,4 @@ while True:
 
         # Remove from our list of users
         del clients[notified_socket]
+
