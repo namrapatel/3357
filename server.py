@@ -11,15 +11,17 @@ userList = []
 def accept(sock,mask):
     conn, address = sock.accept()
     sockets.append(conn)
-    print("Accepted connection from client address: ", address)
     conn.setblocking(False)
     data = conn.recv(1024)  
-    if data:
-        data=data.decode()
-        # check if username exists in userList
-        if data in userList:
+    data=data.decode()
+    
+    # check if username exists in userList
+    if data in userList:
             sendError(conn, "401 Client already registered")
+            sel.register(conn, selectors.EVENT_READ, read)
             return
+    print("Accepted connection from client address: ", address)
+    if data:
         userList.append(data)
         print("Added user: ", data)
         print("Connection to client established, waiting to recive messages from user: ",data)
@@ -35,7 +37,7 @@ def read(conn, mask):
     if data:
         print(data.decode())
         #conn.sendall(data) 
-        broadcast(conn,data.decode()) 
+        broadcast(conn, data.decode()) 
     else:
         print('closing', conn)
         sel.unregister(conn)

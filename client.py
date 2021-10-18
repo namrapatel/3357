@@ -1,14 +1,19 @@
 import socket
 import sys
-import selectors
 import select
 import argparse
 from urllib.parse import urlparse
+import signal
 
-sel = selectors.DefaultSelector()
 registeredError = "401 Client already registered"
 
 def main(path, username):
+    def handler(signum, frame):
+        res = input("Interrupt recieved, shutting down...")
+        exit(1)
+    
+    signal.signal(signal.SIGINT, handler)
+
     url = urlparse(path)
     serverPort = url.port
     serverName = url.hostname
@@ -18,7 +23,6 @@ def main(path, username):
     clientSocket.setblocking(False)
     print('Connection to server established. Sending intro message...')
     clientSocket.send(username.encode())
-    # sel.register(selectors.EVENT_READ | selectors.EVENT_WRITE)
 
     print("Registration successful. Ready for Messaging!")
     while True:
@@ -31,19 +35,17 @@ def main(path, username):
                 for socks in read_sockets:
                     if socks == clientSocket:
                         message = socks.recv(2048)
+                        if (message.decode().find(registeredError) != -1):
+                            print("401 Client already registered")
+                            raise Exception
                         print(message.decode())
+                        
                     else:
                         message = sys.stdin.readline()
+                        message = "@" + username + ": " + message
                         clientSocket.send(message.encode())
                         print("<You>" + message)
-
-                # sentence = sys.stdin.readline()
-                # clientSocket.send(sentence.encode())
-                # modifiedSentence = clientSocket.recv(1024)
-                # print("From Server: ", modifiedSentence.decode())
-                # if (modifiedSentence.decode().find(registeredError) != -1):
-                #     raise Exception
-                # print("sent")
+                
 
         except BlockingIOError as e:
             # print(e)
@@ -51,9 +53,9 @@ def main(path, username):
 
         except Exception as e:
             print(e)
-            if (e==0):
-                print("401 Client already registered")
             sys.exit()
+    
+    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Chat Client')
