@@ -1,6 +1,7 @@
 import socket
 import sys
 import selectors
+import select
 import argparse
 from urllib.parse import urlparse
 
@@ -17,19 +18,32 @@ def main(path, username):
     clientSocket.setblocking(False)
     print('Connection to server established. Sending intro message...')
     clientSocket.send(username.encode())
+    # sel.register(selectors.EVENT_READ | selectors.EVENT_WRITE)
 
     print("Registration successful. Ready for Messaging!")
     while True:
         try:
             while True:
+                sockets_list = [sys.stdin, clientSocket]
                 clientSocket.setblocking(False)
-                sentence = sys.stdin.readline()
-                clientSocket.send(sentence.encode())
-                modifiedSentence = clientSocket.recv(1024)
-                print("From Server: ", modifiedSentence.decode())
-                if (modifiedSentence.decode().find(registeredError) != -1):
-                    raise Exception
-                print("sent")
+                read_sockets,write_socket, error_socket = select.select(sockets_list,[],[])
+ 
+                for socks in read_sockets:
+                    if socks == clientSocket:
+                        message = socks.recv(2048)
+                        print(message.decode())
+                    else:
+                        message = sys.stdin.readline()
+                        clientSocket.send(message.encode())
+                        print("<You>" + message)
+
+                # sentence = sys.stdin.readline()
+                # clientSocket.send(sentence.encode())
+                # modifiedSentence = clientSocket.recv(1024)
+                # print("From Server: ", modifiedSentence.decode())
+                # if (modifiedSentence.decode().find(registeredError) != -1):
+                #     raise Exception
+                # print("sent")
 
         except BlockingIOError as e:
             # print(e)
