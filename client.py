@@ -22,17 +22,17 @@ def main(path, username):
     while True:
         try:
             while True:
-                sentence = input()
                 clientSocket.setblocking(False)
+                sentence = sys.stdin.readline()
                 clientSocket.send(sentence.encode())
-                print("sent")
                 modifiedSentence = clientSocket.recv(1024)
                 print("From Server: ", modifiedSentence.decode())
-                print(modifiedSentence.decode().find(registeredError))
                 if (modifiedSentence.decode().find(registeredError) != -1):
                     raise Exception
+                print("sent")
 
         except BlockingIOError as e:
+            # print(e)
             pass
 
         except Exception as e:

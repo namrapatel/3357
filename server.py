@@ -11,7 +11,7 @@ userList = []
 def accept(sock,mask):
     conn, address = sock.accept()
     sockets.append(conn)
-    print("Accepted connection from client address: ", address )
+    print("Accepted connection from client address: ", address)
     conn.setblocking(False)
     data = conn.recv(1024)  
     if data:
