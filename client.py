@@ -16,28 +16,15 @@ def main(path, username):
     clientSocket.setblocking(False)
     print('Connection to server established. Sending intro message...')
     clientSocket.send(username.encode())
-    sel.register(clientSocket,selectors.EVENT_READ | selectors.EVENT_WRITE,)
-
 
     print("Registration successful. Ready for Messaging!")
     while True:
         print("here")
         sentence = input()
-        events = sel.select(timeout=None)
-        for key, mask in events:
-            if mask & selectors.EVENT_WRITE:
-                print("write")
-                if not sentence:
-                    sel.modify(clientSocket,selectors.EVENT_READ)
-                else:
-                    print("send")
-                    clientSocket.send(sentence.encode())
-                    sel.modify(clientSocket,selectors.EVENT_READ)
-            if mask & selectors.EVENT_READ:
-                print("read")
-                modifiedSentence = clientSocket.recv(1024)
-                print("From Server: ", modifiedSentence.decode())
-                sel.modify(clientSocket,selectors.EVENT_WRITE)
+        clientSocket.setblocking(False)
+        clientSocket.send(sentence.encode())
+        modifiedSentence = clientSocket.recv(1024)
+        print("From Server: ", modifiedSentence.decode())
         #modifiedSentence = clientSocket.recv(1024)
         #print("From Server: ", modifiedSentence.decode())
         #if(sentence=='quit'): break;
@@ -49,4 +36,3 @@ if __name__ == '__main__':
     parser.add_argument('username',type=str)
     arguments= parser.parse_args()
     main(arguments.path, arguments.username)
-## random
