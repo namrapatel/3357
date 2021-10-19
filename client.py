@@ -32,8 +32,10 @@ def main(path, username):
     signal.signal(signal.SIGINT, handler)
 
     while True:
+        print("STARTED")
         try:
             while True:
+                print("AGAIN")
                 sockets_list = [sys.stdin, clientSocket]
                 clientSocket.setblocking(False)
                 read_sockets,write_socket, error_socket = select.select(sockets_list,[],[])
@@ -45,14 +47,18 @@ def main(path, username):
                             print("401 Client already registered")
                             raise Exception
                         if (message.decode().find(DISCONNECT_MESSAGE) != -1):
+                            print("5")
                             clientSocket.close()
+                            sys.exit()
+                        print("6")
                         print(message.decode())
+                        print("7")
                         
                     else:
                         message = sys.stdin.readline()
                         message = "@" + username + ": " + message
                         clientSocket.send(message.encode())
-                        print("<You>" + message)
+                        print("@" + "username: " + message)
                 
 
         except BlockingIOError as e:

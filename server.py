@@ -29,7 +29,8 @@ def read(conn, mask):
     message = message.decode()
     if message:
         print(message)
-        handleClientDisconnect(conn, message)
+        if (message.find("DISCONNECT") != -1):
+            handleClientDisconnect(conn, message)
         broadcast(conn, message) 
         
 def broadcast(conn, message):
@@ -45,21 +46,20 @@ def sendError(conn, message):
             key.send(message)
 
 def handleClientDisconnect(conn, message):
-    if (message.find("DISCONNECT") != -1):
-        for connection, username in sockets.items():
-            if (message.find(username) != -1):
-                print("Disconnecting user ", username)
-                sockets.pop(getKey(sockets, username))
-                sel.unregister(conn)
-                conn.close()
-                break
-        if (len(sockets) == 1):
-            for key in sockets:
-                remainingSocket = key
-            remainingSocket.send("Disconnected from server, exiting...".encode())
-            remainingSocket.close()
-            serv_socket.close()
-            sys.exit()
+    for connection, username in sockets.items():
+        if (message.find(username) != -1):
+            print("Disconnecting user ", username)
+            sockets.pop(getKey(sockets, username))
+            sel.unregister(conn)
+            conn.close()
+            break
+    if (len(sockets) == 1):
+        for key in sockets:
+            remainingSocket = key
+        remainingSocket.send("Disconnected from server, exiting...".encode())
+        remainingSocket.close()
+        serv_socket.close()
+        sys.exit()
 
 def getKey(dict, val):
     for key, value in dict.items():
