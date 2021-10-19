@@ -8,12 +8,7 @@ import signal
 registeredError = "401 Client already registered"
 
 def main(path, username):
-    def handler(signum, frame):
-        res = input("Interrupt recieved, shutting down...")
-        exit(1)
-    
-    signal.signal(signal.SIGINT, handler)
-
+   
     url = urlparse(path)
     serverPort = url.port
     serverName = url.hostname
@@ -25,6 +20,15 @@ def main(path, username):
     clientSocket.send(username.encode())
 
     print("Registration successful. Ready for Messaging!")
+
+    def handler(signum, frame):
+        res = input("Interrupt recieved, shutting down...")
+        disconnectMessage = "DISCONNECT " + username + " CHAT/1.0"
+        clientSocket.send(disconnectMessage.encode())
+        exit()
+    
+    signal.signal(signal.SIGINT, handler)
+
     while True:
         try:
             while True:

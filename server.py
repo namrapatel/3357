@@ -5,59 +5,72 @@ import selectors
 import argparse
 
 sel = selectors.DefaultSelector()
-sockets = []
-userList = []
+sockets = {}
+serv_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 def accept(sock,mask):
     conn, address = sock.accept()
-    sockets.append(conn)
     conn.setblocking(False)
-    data = conn.recv(1024)  
-    data=data.decode()
+    username = conn.recv(1024)  
+    username = username.decode()
     
     # check if username exists in userList
-    if data in userList:
-            sendError(conn, "401 Client already registered")
-            sel.register(conn, selectors.EVENT_READ, read)
-            return
+    if (any(username in sublist for sublist in sockets.items())):
+        sendError(conn, "401 Client already registered")
+        sel.register(conn, selectors.EVENT_READ, read)
+        return
+    sockets[conn] = username
     print("Accepted connection from client address: ", address)
-    if data:
-        userList.append(data)
-        print("Added user: ", data)
-        print("Connection to client established, waiting to recive messages from user: ",data)
-    else:
-        print('closing', conn)
-        sel.unregister(conn)
-        conn.close()
+    print("Connection to client established, waiting to recive messages from user: ",username)
     sel.register(conn, selectors.EVENT_READ, read)
-    print(userList)
 
 def read(conn, mask):
-    data = conn.recv(1024)  
-    if data:
-        print(data.decode())
-        #conn.sendall(data) 
-        broadcast(conn, data.decode()) 
-    else:
-        print('closing', conn)
-        sel.unregister(conn)
-        conn.close()
-
+    message = conn.recv(1024)  
+    message = message.decode()
+    if message:
+        print(message)
+        handleClientDisconnect(conn, message)
+        broadcast(conn, message) 
+        
 def broadcast(conn, message):
     message = message.encode()
-    for socket in sockets:
-        if socket != conn:
-            socket.send(message)
+    for key in sockets:
+        if key != conn:
+            key.send(message)
 
 def sendError(conn, message):
     message = message.encode()
-    for socket in sockets:
-        if socket == conn:
-            socket.send(message)
+    for key in sockets:
+        if key == conn:
+            key.send(message)
+
+def handleClientDisconnect(conn, message):
+    if (message.find("DISCONNECT") != -1):
+        for connection, username in sockets.items():
+            if (message.find(username) != -1):
+                print("Disconnecting user ", username)
+                sockets.pop(getKey(sockets, username))
+                sel.unregister(conn)
+                conn.close()
+                break
+        print("got here")
+        print("sockets len ", len(sockets))
+        if (len(sockets) == 1):
+            print("NOW HERE")
+            for key in sockets:
+                remainingSocket = key
+            remainingSocket.send("Disconnected from server, exiting...".encode())
+            serv_socket.shutdown(socket.SHUT_RDWR)
+            serv_socket.close()
+
+def getKey(dict, val):
+    for key, value in dict.items():
+        if val == value:
+             return key
+ 
+    return "There is no such Key"
 
 def main():
-
-    serv_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     serv_socket.bind(('',0))
     server_port = serv_socket.getsockname()[1]
     print("will wait for client connection at port " , server_port)
@@ -65,7 +78,6 @@ def main():
     serv_socket.setblocking(False)
     print("Waiting for incoming client connection ...")
     sel.register(serv_socket, selectors.EVENT_READ,)
-
 
     while True:
         try: 
