@@ -31,7 +31,7 @@ def accept(sock,mask):
     selector.register(connectionSocket, selectors.EVENT_READ, read) # Put selector back in READ-mode for future use
 
 # Read and handle messages from existing connectionSockets
-def read(connectionSocket):
+def read(connectionSocket, mask):
 
      # Listen to connectionSocket, convert incoming message from bytes to str and store in message
     message = connectionSocket.recv(1024).decode()
@@ -66,6 +66,8 @@ def sendToSelected(connectionSocket, message):
 # Helper method to handle disconnecting clients, passed connectionSocket (client who sent message), and disconnection message (message)
 def handleClientDisconnect(connectionSocket, message):
 
+    checkRegistry() # Check registry to see if this was the only client
+
     # Check if any usernames from the registry can be found in the disconnection message, if so, remove the client with that username
     for connection, username in registry.items():
         if (message.find(username) != -1): 
@@ -75,7 +77,11 @@ def handleClientDisconnect(connectionSocket, message):
             connectionSocket.close() # Close this client's socket
             break
     
-    # If registry has 1 or less user remaining, shutdown the server
+    checkRegistry() # Check registry to see how many clients remain post-removal
+    
+# Helper method that checks if registry has 1 or less user remaining, is so, shuts down the server
+def checkRegistry():
+
     if (len(registry) <= 1):
         for key in registry:
             remainingSocket = key # Get remaining client's socket

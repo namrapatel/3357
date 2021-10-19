@@ -5,6 +5,7 @@ import argparse
 from urllib.parse import urlparse
 import signal
 
+# Constants to store string messages that will be recieved from server
 REGISTRATION_ERROR = "400 Invalid registration"
 CLIENT_REGISTERED_ERROR = "401 Client already registered"
 REGISTRATION_SUCCESSFUL = "200 Registration successful"
@@ -14,10 +15,10 @@ def main(path, username):
    
     url = urlparse(path)
     serverPort = url.port
-    serverName = url.hostname
+    serverHost = url.hostname
     print('Connecting to server...')
     clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    clientSocket.connect((serverName,serverPort))
+    clientSocket.connect((serverHost,serverPort))
     clientSocket.setblocking(False)
     clientSocket.send(("REGISTER " + username + " CHAT/1.0").encode())
 
@@ -43,7 +44,7 @@ def main(path, username):
                             print("401 Client already registered")
                             raise Exception
                         if (message.decode().find(DISCONNECT_MESSAGE) != -1):
-                            print(message)
+                            print(message.decode())
                             clientSocket.close()
                             sys.exit()
                         if (message.decode().find(REGISTRATION_SUCCESSFUL) != -1):
@@ -70,7 +71,7 @@ def main(path, username):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Chat Client')
-    parser.add_argument('path',type=str)
-    parser.add_argument('username',type=str)
+    parser.add_argument('path', type = str)
+    parser.add_argument('username', type = str)
     arguments= parser.parse_args()
     main(arguments.path, arguments.username)
