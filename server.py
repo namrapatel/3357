@@ -11,7 +11,7 @@ def accept(sock,mask):
     conn.setblocking(False)
     username = conn.recv(1024)  
     username = username.decode()
-    
+    username = username.strip("REGISTER " + " CHAT/1.0")
     # check if username exists in userList
     if (any(username in sublist for sublist in sockets.items())):
         sendToSelected(conn, "401 Client already registered")
@@ -20,7 +20,6 @@ def accept(sock,mask):
         return
 
     sockets[conn] = username
-    print("sockets[conn]: ",sockets[conn])
     print("Accepted connection from client address: ", address)
     print("Connection to client established, waiting to recive messages from user: ", username)
     sendToSelected(conn, "200 Registration successful")
@@ -71,7 +70,7 @@ def getKey(dict, val):
         if val == value:
              return key
  
-    return "There is no such Key"
+    return "Key not found"
 
 def main():
     serv_socket.bind(('',0))

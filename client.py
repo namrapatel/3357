@@ -19,7 +19,6 @@ def main(path, username):
     clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     clientSocket.connect((serverName,serverPort))
     clientSocket.setblocking(False)
-    clientSocket.send((username + "\n").encode())
     clientSocket.send(("REGISTER " + username + " CHAT/1.0").encode())
 
     def handler(signum, frame):
@@ -36,7 +35,7 @@ def main(path, username):
             while True:
                 sockets_list = [sys.stdin, clientSocket]
                 clientSocket.setblocking(False)
-                read_sockets,write_socket, error_socket = select.select(sockets_list,[],[])
+                read_sockets, write_socket, error_socket = select.select(sockets_list,[],[])
                 for socks in read_sockets:
                     if socks == clientSocket:
                         message = socks.recv(2048)
@@ -44,6 +43,7 @@ def main(path, username):
                             print("401 Client already registered")
                             raise Exception
                         if (message.decode().find(DISCONNECT_MESSAGE) != -1):
+                            print(message)
                             clientSocket.close()
                             sys.exit()
                         if (message.decode().find(REGISTRATION_SUCCESSFUL) != -1):
@@ -56,7 +56,7 @@ def main(path, username):
                         message = sys.stdin.readline()
                         message = "@" + username + ": " + message
                         clientSocket.send(message.encode())
-                        print("@" + "username: " + message)
+                        print("\n")
 
         except BlockingIOError as e:
             # print(e)
