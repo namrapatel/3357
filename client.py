@@ -23,7 +23,7 @@ def main(path, username):
     clientSocket.send(("REGISTER " + username + " CHAT/1.0").encode())
 
     def handler(signum, frame):
-        res = input("Interrupt recieved, shutting down...")
+        print("Interrupt recieved, shutting down...")
         disconnectMessage = "DISCONNECT " + username + " CHAT/1.0"
         clientSocket.send(disconnectMessage.encode())
         clientSocket.close()
