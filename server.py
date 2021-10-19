@@ -112,8 +112,6 @@ def main():
             # Use selector's READ/WRITE event handling to intelligently accept new connections or read from existing connections
             events = selector.select(timeout=None)
             for key, mask in events:
-                #callback = key.data
-                #callback(key.fileobj, mask)
                 if key.data is None:
                     accept(key.fileobj, mask) # This method accepts and handles new connections to serverSocket
                 else:
