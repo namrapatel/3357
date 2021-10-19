@@ -1,8 +1,6 @@
-import argparse
 import socket
 import sys
 import selectors
-import argparse
 
 sel = selectors.DefaultSelector()
 sockets = {}
@@ -16,22 +14,29 @@ def accept(sock,mask):
     
     # check if username exists in userList
     if (any(username in sublist for sublist in sockets.items())):
-        sendError(conn, "401 Client already registered")
+        sendToSelected(conn, "401 Client already registered")
         sel.register(conn, selectors.EVENT_READ, read)
+        print("Client already registered, rejecting...")
         return
+
     sockets[conn] = username
+    print("sockets[conn]: ",sockets[conn])
     print("Accepted connection from client address: ", address)
-    print("Connection to client established, waiting to recive messages from user: ",username)
+    print("Connection to client established, waiting to recive messages from user: ", username)
+    sendToSelected(conn, "200 Registration successful")
     sel.register(conn, selectors.EVENT_READ, read)
 
 def read(conn, mask):
     message = conn.recv(1024)  
     message = message.decode()
     if message:
-        print(message)
         if (message.find("DISCONNECT") != -1):
             handleClientDisconnect(conn, message)
-        broadcast(conn, message) 
+        else:
+            if (message.find("REGISTER") == -1):
+                print(message)
+                broadcast(conn, message) 
+            
         
 def broadcast(conn, message):
     message = message.encode()
@@ -39,7 +44,7 @@ def broadcast(conn, message):
         if key != conn:
             key.send(message)
 
-def sendError(conn, message):
+def sendToSelected(conn, message):
     message = message.encode()
     for key in sockets:
         if key == conn:
@@ -53,7 +58,7 @@ def handleClientDisconnect(conn, message):
             sel.unregister(conn)
             conn.close()
             break
-    if (len(sockets) == 1):
+    if (len(sockets) <= 1):
         for key in sockets:
             remainingSocket = key
         remainingSocket.send("Disconnected from server, exiting...".encode())

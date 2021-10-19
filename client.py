@@ -5,7 +5,9 @@ import argparse
 from urllib.parse import urlparse
 import signal
 
-REGISTERED_ERROR = "401 Client already registered"
+REGISTRATION_ERROR = "400 Invalid registration"
+CLIENT_REGISTERED_ERROR = "401 Client already registered"
+REGISTRATION_SUCCESSFUL = "200 Registration successful"
 DISCONNECT_MESSAGE = "Disconnected from server, exiting..."
 
 def main(path, username):
@@ -17,10 +19,8 @@ def main(path, username):
     clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     clientSocket.connect((serverName,serverPort))
     clientSocket.setblocking(False)
-    print('Connection to server established. Sending intro message...')
-    clientSocket.send(username.encode())
-
-    print("Registration successful. Ready for Messaging!")
+    clientSocket.send((username + "\n").encode())
+    clientSocket.send(("REGISTER " + username + " CHAT/1.0").encode())
 
     def handler(signum, frame):
         res = input("Interrupt recieved, shutting down...")
@@ -32,34 +32,31 @@ def main(path, username):
     signal.signal(signal.SIGINT, handler)
 
     while True:
-        print("STARTED")
         try:
             while True:
-                print("AGAIN")
                 sockets_list = [sys.stdin, clientSocket]
                 clientSocket.setblocking(False)
                 read_sockets,write_socket, error_socket = select.select(sockets_list,[],[])
- 
                 for socks in read_sockets:
                     if socks == clientSocket:
                         message = socks.recv(2048)
-                        if (message.decode().find(REGISTERED_ERROR) != -1):
+                        if (message.decode().find(CLIENT_REGISTERED_ERROR) != -1):
                             print("401 Client already registered")
                             raise Exception
                         if (message.decode().find(DISCONNECT_MESSAGE) != -1):
-                            print("5")
                             clientSocket.close()
                             sys.exit()
-                        print("6")
+                        if (message.decode().find(REGISTRATION_SUCCESSFUL) != -1):
+                            print("Connection to server established. Sending intro message... \n")
+                            print("Registration successful. Ready for Messaging!")
+                            break
                         print(message.decode())
-                        print("7")
                         
                     else:
                         message = sys.stdin.readline()
                         message = "@" + username + ": " + message
                         clientSocket.send(message.encode())
                         print("@" + "username: " + message)
-                
 
         except BlockingIOError as e:
             # print(e)
