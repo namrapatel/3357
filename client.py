@@ -5,7 +5,8 @@ import argparse
 from urllib.parse import urlparse
 import signal
 
-registeredError = "401 Client already registered"
+REGISTERED_ERROR = "401 Client already registered"
+DISCONNECT_MESSAGE = "Disconnected from server, exiting..."
 
 def main(path, username):
    
@@ -25,7 +26,8 @@ def main(path, username):
         res = input("Interrupt recieved, shutting down...")
         disconnectMessage = "DISCONNECT " + username + " CHAT/1.0"
         clientSocket.send(disconnectMessage.encode())
-        exit()
+        clientSocket.close()
+        sys.exit()
     
     signal.signal(signal.SIGINT, handler)
 
@@ -39,9 +41,11 @@ def main(path, username):
                 for socks in read_sockets:
                     if socks == clientSocket:
                         message = socks.recv(2048)
-                        if (message.decode().find(registeredError) != -1):
+                        if (message.decode().find(REGISTERED_ERROR) != -1):
                             print("401 Client already registered")
                             raise Exception
+                        if (message.decode().find(DISCONNECT_MESSAGE) != -1):
+                            clientSocket.close()
                         print(message.decode())
                         
                     else:

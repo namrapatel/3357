@@ -1,6 +1,6 @@
 import argparse
 import socket
-import os
+import sys
 import selectors
 import argparse
 
@@ -53,15 +53,13 @@ def handleClientDisconnect(conn, message):
                 sel.unregister(conn)
                 conn.close()
                 break
-        print("got here")
-        print("sockets len ", len(sockets))
         if (len(sockets) == 1):
-            print("NOW HERE")
             for key in sockets:
                 remainingSocket = key
             remainingSocket.send("Disconnected from server, exiting...".encode())
-            serv_socket.shutdown(socket.SHUT_RDWR)
+            remainingSocket.close()
             serv_socket.close()
+            sys.exit()
 
 def getKey(dict, val):
     for key, value in dict.items():
