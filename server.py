@@ -1,10 +1,23 @@
 import socket
 import sys
 import selectors
+import signal
 
 selector = selectors.DefaultSelector() # Initialize selector
 registry = {} # Create a dictionary to hold sockets and usernames as key-value pairs
 serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Initialize the main socket for the server
+
+# Asyncronously watch for "CTRL + c" commands from user, if recieved, send disconnection notice to server, close clientSocket, exit program
+def handler(signum, frame):
+    print("Shutting down server...")
+    disconnectMessage = "Server has shutdown, disconnecting..."
+    for sock in registry:
+        sock.send(disconnectMessage.encode())
+        sock.close()
+    serverSocket.close()
+    sys.exit()
+
+signal.signal(signal.SIGINT, handler) # Look for SIGINT signal ("CTRL + c")
 
 # Accept and handle new socket connections to serverSocket
 def accept(sock,mask):
@@ -97,6 +110,8 @@ def getKey(dict, val):
              return key
  
     return "Key not found"
+
+
 
 def main():
     serverSocket.bind(('',0)) # Bind server's socket with any available HOST and PORT, respectively

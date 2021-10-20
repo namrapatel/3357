@@ -10,6 +10,7 @@ REGISTRATION_ERROR = "400 Invalid registration"
 CLIENT_REGISTERED_ERROR = "401 Client already registered"
 REGISTRATION_SUCCESSFUL = "200 Registration successful"
 DISCONNECT_MESSAGE = "Disconnected from server, exiting..."
+SERVER_SHTUDOWN_MESSAGE = "Server has shutdown, disconnecting..."
 
 def main(path, username):
 
@@ -61,6 +62,11 @@ def main(path, username):
                             print("Connection to server established. Sending intro message... \n")
                             print("Registration successful. Ready for Messaging!")
                             break
+                        
+                        if (message.decode().find(SERVER_SHTUDOWN_MESSAGE) != -1):
+                            print(message.decode())
+                            clientSocket.close()
+                            sys.exit()
                     
                         print(message.decode()) # Convert message from bytes to str and print
                         
