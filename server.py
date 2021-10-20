@@ -7,7 +7,7 @@ selector = selectors.DefaultSelector() # Initialize selector
 registry = {} # Create a dictionary to hold sockets and usernames as key-value pairs
 serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Initialize the main socket for the server
 
-# Asyncronously watch for "CTRL + c" commands from user, if recieved, send disconnection notice to server, close clientSocket, exit program
+# Asyncronously watch for "CTRL + c" commands from terminal, if recieved, send disconnection notice to clients, close all sockets, exit program
 def handler(signum, frame):
     print("Shutting down server...")
     disconnectMessage = "Server has shutdown, disconnecting..."

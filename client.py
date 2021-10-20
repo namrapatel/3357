@@ -13,15 +13,21 @@ DISCONNECT_MESSAGE = "Disconnected from server, exiting..."
 SERVER_SHTUDOWN_MESSAGE = "Server has shutdown, disconnecting..."
 
 def main(path, username):
+    
+    try:
+        url = urlparse(path) # Store path argument in url
+        serverPort = url.port # Store port from the url in serverPort
+        serverHost = url.hostname # Store host from the url in serverHost
+        print('Connecting to server...')
+        clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Initialize clientSocket
+        clientSocket.connect((serverHost, serverPort)) # Connect clientSocket to the HOST and PORT specificed in terminal arguments
+        clientSocket.setblocking(False) # Make clientSocket non-blocking
+        clientSocket.send(("REGISTER " + username + " CHAT/1.0").encode()) # Send encoded registration message to server
 
-    url = urlparse(path) # Store path argument in url
-    serverPort = url.port # Store port from the url in serverPort
-    serverHost = url.hostname # Store host from the url in serverHost
-    print('Connecting to server...')
-    clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Initialize clientSocket
-    clientSocket.connect((serverHost, serverPort)) # Connect clientSocket to the HOST and PORT specificed in terminal arguments
-    clientSocket.setblocking(False) # Make clientSocket non-blocking
-    clientSocket.send(("REGISTER " + username + " CHAT/1.0").encode()) # Send encoded registration message to server
+    # Handle invalid registration
+    except Exception as e:
+        print(REGISTRATION_ERROR)
+        sys.exit()
 
     # Asyncronously watch for "CTRL + c" commands from user, if recieved, send disconnection notice to server, close clientSocket, exit program
     def handler(signum, frame):
@@ -62,7 +68,8 @@ def main(path, username):
                             print("Connection to server established. Sending intro message... \n")
                             print("Registration successful. Ready for Messaging!")
                             break
-                        
+
+                        # If incoming message is SERVER_SHTUDOWN_MESSAGE, print message, close clientSocket, and exit program
                         if (message.decode().find(SERVER_SHTUDOWN_MESSAGE) != -1):
                             print(message.decode())
                             clientSocket.close()
