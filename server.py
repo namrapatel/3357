@@ -1,143 +1,179 @@
 import socket
+import os
+import signal
 import sys
 import selectors
-import signal
 
-selector = selectors.DefaultSelector() # Initialize selector
-registry = {} # Create a dictionary to hold sockets and usernames as key-value pairs
-serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Initialize the main socket for the server
+# Selector for helping us select incoming data and connections from multiple sources.
 
-# Asyncronously watch for "CTRL + c" commands from terminal, if recieved, send disconnection notice to clients, close all sockets, exit program
-def handler(signum, frame):
-    print("Shutting down server...")
-    disconnectMessage = "Server has shutdown, disconnecting..."
-    for sock in registry:
-        sock.send(disconnectMessage.encode())
-        sock.close()
-    serverSocket.close()
-    sys.exit()
+sel = selectors.DefaultSelector()
 
-signal.signal(signal.SIGINT, handler) # Look for SIGINT signal ("CTRL + c")
+# Client list for mapping connected clients to their connections.
 
-# Accept and handle new socket connections to serverSocket
-def accept(sock,mask):
+client_list = []
 
-    connectionSocket, address = sock.accept() # Accept connection and store connection socket and address
-    connectionSocket.setblocking(False) # Make new socket non-blocking
-    
-    # Listen to connectionSocket and accept maximum 1024 bytes, store 
-    # in username, then turn username from bytes to str
-    username = connectionSocket.recv(1024).decode() 
-    username = username.strip("REGISTER " + " CHAT/1.0") # Remove registration message chars from username 
-    
-    # Check if username exists in the registry, if so, send error message and move selector back to READ-mode
-    if (any(username in sublist for sublist in registry.items())):
-        sendToSelected(connectionSocket, "401 Client already registered")
-        selector.register(connectionSocket, selectors.EVENT_READ, read)
-        print("Client already registered, rejecting...")
-        return
+# Signal handler for graceful exiting.  We let clients know in the process so they can disconnect too.
 
-    registry[connectionSocket] = username # Store connectionSocket and username in registry dictionary
-    print("Accepted connection from client address: ", address)
-    print("Connection to client established, waiting to recive messages from user: ", username)
-    sendToSelected(connectionSocket, "200 Registration successful") # Send successful registration message to new connectionSocket
-    selector.register(connectionSocket, selectors.EVENT_READ, read) # Put selector back in READ-mode for future use
+def signal_handler(sig, frame):
+    print('Interrupt received, shutting down ...')
+    message='DISCONNECT CHAT/1.0\n'
+    for reg in client_list:
+        reg[1].send(message.encode())
+    sys.exit(0)
 
-# Read and handle messages from existing connectionSockets
-def read(connectionSocket, mask):
+# Read a single line (ending with \n) from a socket and return it.
+# We will strip out the \r and the \n in the process.
 
-     # Listen to connectionSocket, convert incoming message from bytes to str and store in message
-    message = connectionSocket.recv(1024).decode()
+def get_line_from_socket(sock):
 
-    if message:
-        # Check if recieved message is a disconnection message, if so, handle, else, print message to server 
-        # console and broadcast it to all connectionSockets (clients) except sender
-        if (message.find("DISCONNECT") != -1): 
-            handleClientDisconnect(connectionSocket, message)
-        else: 
-            print(message) 
-            broadcast(connectionSocket, message) 
-            
-# Broadcast message to all connectionSockets (clients) except the connectionSocket passed in params
-def broadcast(connectionSocket, message):
+    done = False
+    line = ''
+    while (not done):
+        char = sock.recv(1).decode()
+        if (char == '\r'):
+            pass
+        elif (char == '\n'):
+            done = True
+        else:
+            line = line + char
+    return line
 
-    message = message.encode() # Convert message from str to bytes 
+# Search the client list for a particular user.
 
-    for key in registry:
-        if key != connectionSocket:
-            key.send(message)
+def client_search(user):
+    for reg in client_list:
+        if reg[0] == user:
+            return reg[1]
+    return None
 
-# Send message to the connectionSocket (client) specificed in params from registry 
-def sendToSelected(connectionSocket, message):
+# Search the client list for a particular user by their socket.
 
-    message = message.encode() # Convert message from str to bytes 
+def client_search_by_socket(sock):
+    for reg in client_list:
+        if reg[1] == sock:
+            return reg[0]
+    return None
 
-    for key in registry:
-        if key == connectionSocket:
-            key.send(message)
+# Add a user to the client list.
 
-# Helper method to handle disconnecting clients, passed connectionSocket (client who sent message), and disconnection message (message)
-def handleClientDisconnect(connectionSocket, message):
+def client_add(user, conn):
+    registration = (user, conn)
+    client_list.append(registration)
 
-    checkRegistry() # Check registry to see if this was the only client
+# Remove a client when disconnected.
 
-    # Check if any usernames from the registry can be found in the disconnection message, if so, remove the client with that username
-    for connection, username in registry.items():
-        if (message.find(username) != -1): 
-            print("Disconnecting user ", username)
-            registry.pop(getKey(registry, username))
-            selector.unregister(connectionSocket) # Unregister this client from selector
-            connectionSocket.close() # Close this client's socket
+def client_remove(user):
+    for reg in client_list:
+        if reg[0] == user:
+            client_list.remove(reg)
             break
-    
-    checkRegistry() # Check registry to see how many clients remain post-removal
-    
-# Helper method that checks if registry has 1 or less user remaining, is so, shuts down the server
-def checkRegistry():
 
-    if (len(registry) <= 1):
-        for key in registry:
-            remainingSocket = key # Get remaining client's socket
-        remainingSocket.send("Disconnected from server, exiting...".encode()) # Send last remaining client a disconnection notice
-        remainingSocket.close() # Close remaining client's socket
-        serverSocket.close() # Close main server socket
-        sys.exit() # Exit program
+# Function to read messages from clients.
 
-# Given a dictionary and a value, return the key for that respective value, else return "Key not found"
-def getKey(dict, val):
-    for key, value in dict.items():
-        if val == value:
-             return key
+def read_message(sock, mask):
+    message = get_line_from_socket(sock)
+
+    # Does this indicate a closed connection?
+
+    if message == '':
+        print('Closing connection')
+        sel.unregister(sock)
+        sock.close()
+
+    # Receive the message.  
+
+    else:
+        user = client_search_by_socket(sock)
+        print(f'Received message from user {user}:  ' + message)
+        words = message.split(' ')
+
+        # Check for client disconnections.  
  
-    return "Key not found"
+        if words[0] == 'DISCONNECT':
+            print('Disconnecting user ' + user)
+            client_remove(user)
+            sel.unregister(sock)
+            sock.close()
+
+        # Send message to all users.  Send at most only once, and don't send to yourself. 
+        # Need to re-add stripped newlines here.
+
+        else:
+            for reg in client_list:
+                if reg[0] == user:
+                    continue
+                client_sock = reg[1]
+                forwarded_message = f'{message}\n'
+                client_sock.send(forwarded_message.encode())
+
+# Function to accept and set up clients.
+
+def accept_client(sock, mask):
+    conn, addr = sock.accept()
+    print('Accepted connection from client address:', addr)
+    message = get_line_from_socket(conn)
+    message_parts = message.split()
+
+    # Check format of request.
+
+    if ((len(message_parts) != 3) or (message_parts[0] != 'REGISTER') or (message_parts[2] != 'CHAT/1.0')):
+        print('Error:  Invalid registration message.')
+        print('Received: ' + message)
+        print('Connection closing ...')
+        response='400 Invalid registration\n'
+        conn.send(response.encode())
+        conn.close()
+
+    # If request is properly formatted and user not already listed, go ahead with registration.
+
+    else:
+        user = message_parts[1]
+
+        if (client_search(user) == None):
+            client_add(user,conn)
+            print(f'Connection to client established, waiting to receive messages from user \'{user}\'...')
+            response='200 Registration succesful\n'
+            conn.send(response.encode())
+            conn.setblocking(False)
+            sel.register(conn, selectors.EVENT_READ, read_message)
+
+        # If user already in list, return a registration error.
+
+        else:
+            print('Error:  Client already registered.')
+            print('Connection closing ...')
+            response='401 Client already registered\n'
+            conn.send(response.encode())
+            conn.close()
 
 
+# Our main function.
 
 def main():
-    serverSocket.bind(('',0)) # Bind server's socket with any available HOST and PORT, respectively
-    serverPort = serverSocket.getsockname()[1] # Store PORT number
-    print("Will wait for client connection at port " , serverPort)
-    serverSocket.listen(100) # Open server socket to 100 connections
-    serverSocket.setblocking(False) # Make the server socket non-blocking
-    print("Waiting for incoming client connection ...")
-    selector.register(serverSocket, selectors.EVENT_READ,) # Register selector in READ-mode to listen for events
 
-    while True:
-        try: 
-            # Use selector's READ/WRITE event handling to intelligently accept new connections or read from existing connections
-            events = selector.select(timeout=None)
-            for key, mask in events:
-                if key.data is None:
-                    accept(key.fileobj, mask) # This method accepts and handles new connections to serverSocket
-                else:
-                    read(key.fileobj, mask) # This method reads messages sent to serverSocket from existing socket connections
-        
-        # Exception handling
-        except BlockingIOError as e:
-            pass
-        except Exception as e:
-            print(e)
+    # Register our signal handler for shutting down.
 
+    signal.signal(signal.SIGINT, signal_handler)
+
+    # Create the socket.  We will ask this to work on any interface and to pick
+    # a free port at random.  We'll print this out for clients to use.
+
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind(('', 0))
+    print('Will wait for client connections at port ' + str(server_socket.getsockname()[1]))
+    server_socket.listen(100)
+    server_socket.setblocking(False)
+    sel.register(server_socket, selectors.EVENT_READ, accept_client)
+    print('Waiting for incoming client connections ...')
+     
+    # Keep the server running forever, waiting for connections or messages.
+    
+    while(True):
+        events = sel.select()
+        for key, mask in events:
+            callback = key.data
+            callback(key.fileobj, mask)    
 
 if __name__ == '__main__':
     main()
+

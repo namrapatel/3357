@@ -1,100 +1,158 @@
 import socket
+import os
+import signal
 import sys
-import select
 import argparse
 from urllib.parse import urlparse
-import signal
+import selectors
 
-# Constants to store string messages that will be recieved from server
-REGISTRATION_ERROR = "400 Invalid registration"
-CLIENT_REGISTERED_ERROR = "401 Client already registered"
-REGISTRATION_SUCCESSFUL = "200 Registration successful"
-DISCONNECT_MESSAGE = "Disconnected from server, exiting..."
-SERVER_SHTUDOWN_MESSAGE = "Server has shutdown, disconnecting..."
+# Selector for helping us select incoming data from the server and messages typed in by the user.
 
-def main(path, username):
-    
-    try:
-        url = urlparse(path) # Store path argument in url
-        serverPort = url.port # Store port from the url in serverPort
-        serverHost = url.hostname # Store host from the url in serverHost
-        print('Connecting to server...')
-        clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Initialize clientSocket
-        clientSocket.connect((serverHost, serverPort)) # Connect clientSocket to the HOST and PORT specificed in terminal arguments
-        clientSocket.setblocking(False) # Make clientSocket non-blocking
-        clientSocket.send(("REGISTER " + username + " CHAT/1.0").encode()) # Send encoded registration message to server
+sel = selectors.DefaultSelector()
 
-    # Handle invalid registration
-    except Exception as e:
-        print(REGISTRATION_ERROR)
-        sys.exit()
+# Socket for sending messages.
 
-    # Asyncronously watch for "CTRL + c" commands from user, if recieved, send disconnection notice to server, close clientSocket, exit program
-    def handler(signum, frame):
-        print("Interrupt recieved, shutting down...")
-        disconnectMessage = "DISCONNECT " + username + " CHAT/1.0"
-        clientSocket.send(disconnectMessage.encode())
-        clientSocket.close()
-        sys.exit()
-    
-    signal.signal(signal.SIGINT, handler) # Look for SIGINT signal ("CTRL + c")
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    while True:
-        try:
-            while True:
-                socketsList = [sys.stdin, clientSocket] # Maintain a list of sockets
-                clientSocket.setblocking(False) 
-                readSockets, writeSockets, errorSockets = select.select(socketsList,[],[]) # Use .select to constantly find list of read-ready sockets
+# User name for tagging sent messages.
 
-                # Loop through readSockets (read-ready sockets)
-                for socks in readSockets:
+user = ''
 
-                    if socks == clientSocket: # If clientSocket is ready-ready, then do the following
-                        message = socks.recv(2048) # Listen to socket and store incoming messages in message
-                        
-                        # If incoming message is CLIENT_REGISTERED_ERROR, print error and throw Exception
-                        if (message.decode().find(CLIENT_REGISTERED_ERROR) != -1):
-                            print("401 Client already registered")
-                            raise Exception
+# Signal handler for graceful exiting.  Let the server know when we're gone.
 
-                        # If incoming message is DISCONNECT_MESSAGE, print decoded message, close clientSocket, and exit program
-                        if (message.decode().find(DISCONNECT_MESSAGE) != -1):
-                            print(message.decode())
-                            clientSocket.close()
-                            sys.exit()
+def signal_handler(sig, frame):
+    print('Interrupt received, shutting down ...')
+    message=f'DISCONNECT {user} CHAT/1.0\n'
+    client_socket.send(message.encode())
+    sys.exit(0)
 
-                        # If incoming message is REGISTRATION_SUCCESSFUL, print success strings and break loop
-                        if (message.decode().find(REGISTRATION_SUCCESSFUL) != -1):
-                            print("Connection to server established. Sending intro message... \n")
-                            print("Registration successful. Ready for Messaging!")
-                            break
+# Simple function for setting up a prompt for the user.
 
-                        # If incoming message is SERVER_SHTUDOWN_MESSAGE, print message, close clientSocket, and exit program
-                        if (message.decode().find(SERVER_SHTUDOWN_MESSAGE) != -1):
-                            print(message.decode())
-                            clientSocket.close()
-                            sys.exit()
-                    
-                        print(message.decode()) # Convert message from bytes to str and print
-                        
-                    else: #clientSocket was not read-ready, so we look for input from user
-                        message = sys.stdin.readline() # Take input from user and store in message
-                        message = "@" + username + ": " + message # Concatenate "@username: " to message
-                        clientSocket.send(message.encode()) # Convert message from str to bytes and send
-                        print("\n")
+def do_prompt(skip_line=False):
+    if (skip_line):
+        print("")
+    print("> ", end='', flush=True)
 
-        # Exception handling
-        except BlockingIOError as e:
+# Read a single line (ending with \n) from a socket and return it.
+# We will strip out any \r and \n in the process.
+
+def get_line_from_socket(sock):
+
+    done = False
+    line = ''
+    while (not done):
+        char = sock.recv(1).decode()
+        if (char == '\r'):
             pass
-        except Exception as e:
-            print(e)
-            sys.exit()
+        elif (char == '\n'):
+            done = True
+        else:
+            line = line + char
+    return line
+
+# Function to handle incoming messages from server.  Also look for disconnect messages to shutdown.
+
+def handle_message_from_server(sock, mask):
+    message=get_line_from_socket(sock)
+    words=message.split(' ')
+    print()
+    if words[0] == 'DISCONNECT':
+        print('Disconnected from server ... exiting!')
+        sys.exit(0)
+    else:
+        print(message)
+        do_prompt()
+
+# Function to handle incoming messages from user.
+
+def handle_keyboard_input(file, mask):
+    line=sys.stdin.readline()
+    message = f'@{user}: {line}'
+    client_socket.send(message.encode())
+    do_prompt()
+
+# Our main function.
+
+def main():
+
+    global user
+    global client_socket
+
+    # Register our signal handler for shutting down.
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+    # Check command line arguments to retrieve a URL.
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("user", help="user name for this user on the chat service")
+    parser.add_argument("server", help="URL indicating server location in form of chat://host:port")
+    args = parser.parse_args()
+
+    # Check the URL passed in and make sure it's valid.  If so, keep track of
+    # things for later.
+
+    try:
+        server_address = urlparse(args.server)
+        if ((server_address.scheme != 'chat') or (server_address.port == None) or (server_address.hostname == None)):
+            raise ValueError
+        host = server_address.hostname
+        port = server_address.port
+    except ValueError:
+        print('Error:  Invalid server.  Enter a URL of the form:  chat://host:port')
+        sys.exit(1)
+    user = args.user
+
+    # Now we try to make a connection to the server.
+
+    print('Connecting to server ...')
+    try:
+        client_socket.connect((host, port))
+    except ConnectionRefusedError:
+        print('Error:  That host or port is not accepting connections.')
+        sys.exit(1)
+
+    # The connection was successful, so we can prep and send a registration message.
     
+    print('Connection to server established. Sending intro message...\n')
+    message = f'REGISTER {user} CHAT/1.0\n'
+    client_socket.send(message.encode())
+   
+    # Receive the response from the server and start taking a look at it
+
+    response_line = get_line_from_socket(client_socket)
+    response_list = response_line.split(' ')
+        
+    # If an error is returned from the server, we dump everything sent and
+    # exit right away.  
     
+    if response_list[0] != '200':
+        print('Error:  An error response was received from the server.  Details:\n')
+        print(response_line)
+        print('Exiting now ...')
+        sys.exit(1)   
+    else:
+        print('Registration successful.  Ready for messaging!')
+
+    # Set up our selector.
+
+    client_socket.setblocking(False)
+    sel.register(client_socket, selectors.EVENT_READ, handle_message_from_server)
+    sel.register(sys.stdin, selectors.EVENT_READ, handle_keyboard_input)
+    
+    # Prompt the user before beginning.
+
+    do_prompt()
+
+    # Now do the selection.
+
+    while(True):
+        events = sel.select()
+        for key, mask in events:
+            callback = key.data
+            callback(key.fileobj, mask)    
+
+
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description = 'Client')
-    parser.add_argument('path', type = str) # First argument from terminal is the path
-    parser.add_argument('username', type = str) # Second argument from terminal is the username
-    arguments = parser.parse_args()
-    main(arguments.path, arguments.username) # Call main method with path and username as params
+    main()
