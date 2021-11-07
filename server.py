@@ -12,6 +12,10 @@ sel = selectors.DefaultSelector()
 
 client_list = []
 
+# Dictionary of follow_lists
+
+dict_of_follow_lists = {}
+
 # Signal handler for graceful exiting.  We let clients know in the process so they can disconnect too.
 
 def signal_handler(sig, frame):
@@ -59,6 +63,10 @@ def client_search_by_socket(sock):
 def client_add(user, conn):
     registration = (user, conn)
     client_list.append(registration)
+    temp = "@"+all
+    temp2 = "@"+user
+    client_follow_list = [temp, temp2]
+    dict_of_follow_lists[user] = client_follow_list
 
 # Remove a client when disconnected.
 
@@ -67,6 +75,21 @@ def client_remove(user):
         if reg[0] == user:
             client_list.remove(reg)
             break
+
+# Add value to dict_of_follow_lists
+
+def add_values_in_dict(key, list_of_values):
+    if key not in dict_of_follow_lists:
+        dict_of_follow_lists[key] = list()
+    dict_of_follow_lists[key].extend(list_of_values)
+
+# Search for value in dict_of_follow_lists, return list of keys with that value
+
+def get_keys_with_value(value):
+    list_of_keys = [key
+                for key, list_of_values in dict_of_follow_lists.items()
+                if value in list_of_values]
+    return list_of_keys
 
 # Function to read messages from clients.
 
