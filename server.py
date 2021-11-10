@@ -84,6 +84,14 @@ def get_client_list():
         client_list_string += reg[0] + ", "
     return client_list_string
 
+# Loop through list of followed terms and return the list as a string.
+
+def get_follow_terms(user):
+    follow_list = ""
+    for item in dict_of_follow_lists[user]:
+        follow_list += item + ", "
+    return follow_list
+
 # Add value to dict_of_follow_lists
 
 def add_values_in_dict(key, list_of_values):
@@ -130,19 +138,33 @@ def read_message(sock, mask):
         words[0] = words[0][:-1]
 
         # If !list is recieved, send the list of registered clients as a comma-separated string.
-        if words[1] == "!list":
+        if words[1] == '!list':
             returned_list = get_client_list()
             forwarded_message = f'{returned_list}\n'
-            sock.send(forwarded_message.encode())
+            forwarded_message = forwarded_message.encode()
+            sock.send(forwarded_message)
+        
         # If "!follow?" is recieved, send the list of followed items as a comma-separated string.
         elif words[1] == '!follow?':
-            message = dict_of_follow_lists[user].encode()
-            client_search(user).send(message)
-        # If "!follow" is recieved, add the term that follows to the list of followed users.
-        elif words[1] == '!follow' and words[2] == 'term':
-            dict_of_follow_lists[user].append(words[3])
-            for x in range(len(dict_of_follow_lists)):
-               print(dict_of_follow_lists[x])
+            returned_list = get_follow_terms(user)
+            forwarded_message = f'{returned_list}\n'
+            forwarded_message = forwarded_message.encode()
+            sock.send(forwarded_message)
+        
+        # If "!follow" is recieved, add the term that follows to the list of followed terms.
+        elif words[1] == '!follow' and words[2] != None:
+            if (words[2] in dict_of_follow_lists[user]):
+                err_msg = f'{user} is already following {words[2]}\n'
+                err_msg = err_msg.encode()
+                sock.send(err_msg)
+            else:            
+                dict_of_follow_lists[user].append(words[2])
+                success_msg = f'{user} is now following {words[2]}\n'
+                success_msg = success_msg.encode()
+                sock.send(success_msg)
+
+        # If "!unfollow" is recieved, remove the term that follows from the list of followed terms.
+        elif words[1] == '!unfollow':
 
         # Send message to all users.  Send at most only once, and don't send to yourself. 
         # Need to re-add stripped newlines here.
