@@ -63,7 +63,7 @@ def client_search_by_socket(sock):
 def client_add(user, conn):
     registration = (user, conn)
     client_list.append(registration)
-    temp = "@"+all
+    temp = "@all"
     temp2 = "@"+user
     client_follow_list = [temp, temp2]
     dict_of_follow_lists[user] = client_follow_list
@@ -75,6 +75,14 @@ def client_remove(user):
         if reg[0] == user:
             client_list.remove(reg)
             break
+
+# Loop through list of registered clients and return the list as a string.
+
+def get_client_list():
+    client_list_string = ""
+    for reg in client_list:
+        client_list_string += reg[0] + ", "
+    return client_list_string
 
 # Add value to dict_of_follow_lists
 
@@ -117,6 +125,24 @@ def read_message(sock, mask):
             client_remove(user)
             sel.unregister(sock)
             sock.close()
+        
+        # Remove the ":" from the end of the user name. 
+        words[0] = words[0][:-1]
+
+        # If !list is recieved, send the list of registered clients as a comma-separated string.
+        if words[1] == "!list":
+            returned_list = get_client_list()
+            forwarded_message = f'{returned_list}\n'
+            sock.send(forwarded_message.encode())
+        # If "!follow?" is recieved, send the list of followed items as a comma-separated string.
+        elif words[1] == '!follow?':
+            message = dict_of_follow_lists[user].encode()
+            client_search(user).send(message)
+        # If "!follow" is recieved, add the term that follows to the list of followed users.
+        elif words[1] == '!follow' and words[2] == 'term':
+            dict_of_follow_lists[user].append(words[3])
+            for x in range(len(dict_of_follow_lists)):
+               print(dict_of_follow_lists[x])
 
         # Send message to all users.  Send at most only once, and don't send to yourself. 
         # Need to re-add stripped newlines here.
