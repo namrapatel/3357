@@ -92,21 +92,6 @@ def get_follow_terms(user):
         follow_list += item + ", "
     return follow_list
 
-# Add value to dict_of_follow_lists
-
-def add_values_in_dict(key, list_of_values):
-    if key not in dict_of_follow_lists:
-        dict_of_follow_lists[key] = list()
-    dict_of_follow_lists[key].extend(list_of_values)
-
-# Search for value in dict_of_follow_lists, return list of keys with that value
-
-def get_keys_with_value(value):
-    list_of_keys = [key
-                for key, list_of_values in dict_of_follow_lists.items()
-                if value in list_of_values]
-    return list_of_keys
-
 # Function to read messages from clients.
 
 def read_message(sock, mask):
@@ -125,14 +110,6 @@ def read_message(sock, mask):
         user = client_search_by_socket(sock)
         print(f'Received message from user {user}:  ' + message)
         words = message.split(' ')
-
-        # Check for client disconnections.  
- 
-        if words[0] == 'DISCONNECT':
-            print('Disconnecting user ' + user)
-            client_remove(user)
-            sel.unregister(sock)
-            sock.close()
         
         # Remove the ":" from the end of the user name. 
         words[0] = words[0][:-1]
@@ -154,17 +131,45 @@ def read_message(sock, mask):
         # If "!follow" is recieved, add the term that follows to the list of followed terms.
         elif words[1] == '!follow' and words[2] != None:
             if (words[2] in dict_of_follow_lists[user]):
-                err_msg = f'{user} is already following {words[2]}\n'
+                err_msg = f'Error: You are already following {words[2]}\n'
                 err_msg = err_msg.encode()
                 sock.send(err_msg)
             else:            
                 dict_of_follow_lists[user].append(words[2])
-                success_msg = f'{user} is now following {words[2]}\n'
+                success_msg = f'You are now following {words[2]}\n'
                 success_msg = success_msg.encode()
                 sock.send(success_msg)
 
         # If "!unfollow" is recieved, remove the term that follows from the list of followed terms.
         elif words[1] == '!unfollow':
+            
+            # If the user is not following the term, send an error message.
+            if words[2] not in dict_of_follow_lists[user]:
+                err_msg = f'Error: You are not following {words[2]}\n'
+                err_msg = err_msg.encode()
+                sock.send(err_msg)
+            
+            # Check that the terms the user is trying to remove are not "@all" and "@{user}".
+            if (words[2] == "@all" or words[2] == "@"+user):
+                err_msg = f'Error: You are not allowed to unfollow {words[2]}\n'
+                err_msg = err_msg.encode()
+                sock.send(err_msg)
+            
+            # Else, remove the term from the list of followed terms.
+            else:
+                dict_of_follow_lists[user].remove(words[2])
+                success_msg = f'You are no longer following {words[2]}\n'
+                success_msg = success_msg.encode()
+                sock.send(success_msg)
+        
+        # If "!exit" is recieved, remove the user from the client list and close the connection.
+        elif words[1] == '!exit':
+            disconnection_msg = f'You will now be disconnected from the server.\n'
+            disconnection_msg = disconnection_msg.encode()
+            sock.send(disconnection_msg)
+            client_remove(user)
+            sel.unregister(sock)
+            sock.close()
 
         # Send message to all users.  Send at most only once, and don't send to yourself. 
         # Need to re-add stripped newlines here.
