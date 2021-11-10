@@ -82,6 +82,7 @@ def get_client_list():
     client_list_string = ""
     for reg in client_list:
         client_list_string += reg[0] + ", "
+    client_list_string = client_list_string[:-2]
     return client_list_string
 
 # Loop through list of followed terms and return the list as a string.
@@ -90,6 +91,7 @@ def get_follow_terms(user):
     follow_list = ""
     for item in dict_of_follow_lists[user]:
         follow_list += item + ", "
+    follow_list = follow_list[:-2]
     return follow_list
 
 # Function to read messages from clients.
@@ -111,7 +113,15 @@ def read_message(sock, mask):
         print(f'Received message from user {user}:  ' + message)
         words = message.split(' ')
         
-        # Remove the ":" from the end of the user name. 
+        # Check for client disconnection
+
+        if words[0] == 'DISCONNECT':
+            print('Disconnecting user ' + user)
+            client_remove(user)
+            sel.unregister(sock)
+            sock.close()
+
+        # Remove the ":" from the end of the user name string. 
         words[0] = words[0][:-1]
 
         # If !list is recieved, send the list of registered clients as a comma-separated string.
@@ -171,16 +181,22 @@ def read_message(sock, mask):
             sel.unregister(sock)
             sock.close()
 
-        # Send message to all users.  Send at most only once, and don't send to yourself. 
+        # Send message to all users who follow any term contained in the recieved message. Send at most only once, and don't send to yourself. 
         # Need to re-add stripped newlines here.
 
         else:
             for reg in client_list:
                 if reg[0] == user:
                     continue
-                client_sock = reg[1]
-                forwarded_message = f'{message}\n'
-                client_sock.send(forwarded_message.encode())
+
+                # Check if the user is following any terms in the message, send the message to the user if they are.
+                for item in dict_of_follow_lists[reg[0]]:
+                    if item in words:
+                        client_socket = reg[1]
+                        forwarded_message = f'{message}\n'
+                        forwarded_message = forwarded_message.encode()
+                        client_socket.send(forwarded_message)
+                        break
 
 # Function to accept and set up clients.
 
