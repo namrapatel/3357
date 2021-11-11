@@ -50,6 +50,68 @@ def get_line_from_socket(sock):
             line = line + char
     return line
 
+def recieve_file(words, sock):
+
+    # Ensure that receved info has a length of 6
+    if len(words) == 6:
+
+        # Collect file information from the message recieved from the server
+        file_sender = words[1]
+        file_name = words[2]
+        file_size = words[3]
+        buffer_size = words[4]
+        buffer_size = int(buffer_size)
+        number_of_packets = words[5]
+        number_of_packets = int(number_of_packets)
+
+        # Print header information as specificed by assignment document
+        print(f'\nIncoming file: {file_name}')
+        print(f'Origin: {file_sender}')
+        print(f'Content-Length: {file_size}')
+
+        # Create a new file to store the recieved packets
+        file = open(file_name, 'w')
+        for i in range(0, number_of_packets):
+            recieved_packet = sock.recv(buffer_size).decode()
+            file.write(recieved_packet)
+        print('\nFile recieved, check current directory to view it.')
+
+    else:
+        print('Error: Invalid message from server, file not recieved.')
+        return
+
+
+def send_file(words, sock):
+    buffer_size = 4096 # 4KB
+    file_name = words[1]
+
+    file = open(file_name, 'r')
+    data=file.read() 
+    
+    # Get file size and find number of packets needed to send
+    file_size = len(data) 
+    number_of_packets = int(file_size/buffer_size)
+    if file_size % buffer_size != 0:
+        number_of_packets += 1
+
+    # Send the file metadata to the server so it knows how to setup to recieve the file
+    file_info = f'{file_size}, {buffer_size}, {number_of_packets}\n'
+    file_info = file_info.encode()
+    client_socket.send(file_info)
+
+    # Try sending the file to the server in chunks, if it fails, print an error to the client
+    try:
+        while data != '':
+            sent_packet = file_data[:buffer_size]    # queue up the next amount of bytes to be sent
+            sent_packet = sent_packet.encode()
+            client_socket.send(sent_packet)
+            file_data = file_data[buffer_size:] # begin to deplete the size of the file to keep track of what's been sent
+            print("File was sent to the server.")
+            do_prompt()
+    except:    
+        print("Error: File was not sent to the server.")
+        
+
 # Function to handle incoming messages from server.  Also look for disconnect messages to shutdown.
 
 def handle_message_from_server(sock, mask):
@@ -59,6 +121,10 @@ def handle_message_from_server(sock, mask):
     if words[0] == 'DISCONNECT':
         print('Disconnected from server ... exiting!')
         sys.exit(0)
+    elif words[0] == 'RECIEVE':
+        recieve_file(words, sock)
+    elif words[0] == 'SEND':
+        send_file(words, sock)
     else:
         print(message)
         do_prompt()
