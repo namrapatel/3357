@@ -159,10 +159,10 @@ def command_manager(sock, words, user):
         
     # If "!attach" is recieved, process the file and send to the client
     elif words[1] == '!attach':
-        if words[2] == None or words[3] == None:
-            err_msg = f'Error: !attach command is missing filename or followed terms.\n'
-            err_msg = err_msg.encode()
-            sock.send(err_msg)
+        # if words[2] == None or words[3] == None:
+        #     err_msg = f'Error: !attach command is missing filename or followed terms.\n'
+        #     err_msg = err_msg.encode()
+        #     sock.send(err_msg)
         try: 
             # Request the file from the client
             file_name = words[2]
@@ -209,17 +209,19 @@ def command_manager(sock, words, user):
                         file_recipient.send(file_info.encode())
 
                         # Send packets to file_recipient
+                        fakevar = ready_file
                         while ready_file != "":
-                            packet = file_data[:buffer_size]
+                            packet = fakevar[:buffer_size]
                             packet = packet.encode()
                             file_recipient.send(packet)
-                            file_data = file_data[buffer_size:]
+                            fakevar = fakevar[buffer_size:]
             except:
                 err_msg = f'Error: File was not sent correctly.\n'
                 err_msg = err_msg.encode()
                 sock.send(err_msg)
                         
-        except:
+        except Exception as e:
+            print(e)
             err_msg = f'Error: File was not transferred correctly.\n'
             err_msg = err_msg.encode()
             sock.send(err_msg)
@@ -305,8 +307,9 @@ def accept_client(sock, mask):
             print(f'Connection to client established, waiting to receive messages from user \'{user}\'...')
             response='200 Registration succesful\n'
             conn.send(response.encode())
-            conn.setblocking(False)
+            conn.setblocking(True)
             sel.register(conn, selectors.EVENT_READ, read_message)
+            conn.setblocking(False)
 
         # If user already in list, return a registration error.
 

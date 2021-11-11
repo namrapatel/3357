@@ -52,7 +52,7 @@ def get_line_from_socket(sock):
 
 def recieve_file(words, sock):
 
-    # Ensure that receved info has a length of 6
+    # Ensure that recieved info has a length of 6
     if len(words) == 6:
 
         # Collect file information from the message recieved from the server
@@ -90,8 +90,8 @@ def send_file(words, sock):
     
     # Get file size and find number of packets needed to send
     file_size = len(data) 
-    number_of_packets = int(file_size/buffer_size)
-    if file_size % buffer_size != 0:
+    number_of_packets = int(file_size//buffer_size)
+    if file_size % buffer_size > 0:
         number_of_packets += 1
 
     # Send the file metadata to the server so it knows how to setup to recieve the file
@@ -102,13 +102,14 @@ def send_file(words, sock):
     # Try sending the file to the server in chunks, if it fails, print an error to the client
     try:
         while data != '':
-            sent_packet = file_data[:buffer_size]    # queue up the next amount of bytes to be sent
+            sent_packet = data[:buffer_size]    # queue up the next amount of bytes to be sent
             sent_packet = sent_packet.encode()
             client_socket.send(sent_packet)
-            file_data = file_data[buffer_size:] # begin to deplete the size of the file to keep track of what's been sent
+            data = data[buffer_size:] # begin to deplete the size of the file to keep track of what's been sent
             print("File was sent to the server.")
             do_prompt()
-    except:    
+    except Exception as e:    
+        print(e)
         print("Error: File was not sent to the server.")
         
 
@@ -122,8 +123,10 @@ def handle_message_from_server(sock, mask):
         print('Disconnected from server ... exiting!')
         sys.exit(0)
     elif words[0] == 'RECIEVE':
+        print("in recieve")
         recieve_file(words, sock)
     elif words[0] == 'SEND':
+        print("in send")
         send_file(words, sock)
     else:
         print(message)
