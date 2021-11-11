@@ -156,6 +156,73 @@ def command_manager(sock, words, user):
             success_msg = f'You are no longer following {words[2]}\n'
             success_msg = success_msg.encode()
             sock.send(success_msg)
+        
+    # If "!attach" is recieved, process the file and send to the client
+    elif words[1] == '!attach':
+        if words[2] == None or words[3] == None:
+            err_msg = f'Error: !attach command is missing filename or followed terms.\n'
+            err_msg = err_msg.encode()
+            sock.send(err_msg)
+        try: 
+            # Request the file from the client
+            file_name = words[2]
+            file_request = f'SEND {file_name}\n'
+            sock.send(file_request.encode())
+
+            # Setup file info to be used to recieve the file
+            file_info = get_line_from_socket(sock).split(" ")
+            file_size = file_info[0]
+            file_size = int(file_size[:-1]) # Remove the "," from the end of the file size
+            buffer_size = file_info[1]
+            buffer_size = int(buffer_size[:-1]) # Remove the "," from the end of the buffer size
+            number_of_packets = file_info[2]
+
+            # Try building the file from recieved packets, send an error message if the file is not recieved correctly.
+            try: 
+                ready_file = ""
+                for i in range(0, int(number_of_packets)):
+                    incoming_packet = sock.recv(buffer_size).decode()
+                    ready_file = ready_file + incoming_packet
+            except:
+                err_msg = f'Error: File was not recieved correctly.\n'
+                err_msg = err_msg.encode()
+                sock.send(err_msg)
+
+            # Try sending the file to the correct clients, send an error message if the file is not sent correctly.
+            try:
+                file_sender = user
+                for reg in client_list:
+                    # Ensure we do not send the file to the sender
+                    if reg[0] == file_sender:
+                        continue
+                
+                # Collect the list of subscribed terms the file was meant to be sent to
+                terms = words[3:]
+
+                for item in dict_of_follow_lists[reg[0]]:
+                    if item in terms:
+                        file_recipient = reg[1]
+                        
+                        # Send file information to the file_recipient so it can build header 
+                        file_info = f'RECEIVE {file_sender} {file_name} {file_size} {buffer_size} {number_of_packets}\n'
+                        file_info.encode()
+                        file_recipient.send(file_info.encode())
+
+                        # Send packets to file_recipient
+                        while ready_file != "":
+                            packet = file_data[:buffer_size]
+                            packet = packet.encode()
+                            file_recipient.send(packet)
+                            file_data = file_data[buffer_size:]
+            except:
+                err_msg = f'Error: File was not sent correctly.\n'
+                err_msg = err_msg.encode()
+                sock.send(err_msg)
+                        
+        except:
+            err_msg = f'Error: File was not transferred correctly.\n'
+            err_msg = err_msg.encode()
+            sock.send(err_msg)
 
     # Send the client an error if the command entered is not recognized.
     else: 
@@ -196,7 +263,6 @@ def read_message(sock, mask):
 
         # Send message to all users who follow any term contained in the recieved message. Send at most only once, and don't send to yourself. 
         # Need to re-add stripped newlines here.
-
         else:
             for reg in client_list:
                 if reg[0] == user:
