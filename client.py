@@ -50,6 +50,8 @@ def get_line_from_socket(sock):
             line = line + char
     return line
 
+
+# Collect information about file, setup a new file that will store the incoming packets from the server
 def recieve_file(words, sock):
     # Ensure that recieved info has a length of 6
     if len(words) == 6:
@@ -79,6 +81,7 @@ def recieve_file(words, sock):
         return
 
 
+# Read file from local storage, send server information about file size to prepare, send file in chunks to server
 def send_file(words, sock):
     buffer_size = 4096 # 4KB
     file_name = words[1]
