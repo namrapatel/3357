@@ -51,10 +51,8 @@ def get_line_from_socket(sock):
     return line
 
 def recieve_file(words, sock):
-
     # Ensure that recieved info has a length of 6
     if len(words) == 6:
-
         # Collect file information from the message recieved from the server
         file_sender = words[1]
         file_name = words[2]
@@ -122,11 +120,9 @@ def handle_message_from_server(sock, mask):
     if words[0] == 'DISCONNECT':
         print('Disconnected from server ... exiting!')
         sys.exit(0)
-    elif words[0] == 'RECIEVE':
-        print("in recieve")
+    elif words[0] == 'RECEIVE':
         recieve_file(words, sock)
     elif words[0] == 'SEND':
-        print("in send")
         send_file(words, sock)
     else:
         print(message)

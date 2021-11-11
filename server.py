@@ -159,16 +159,16 @@ def command_manager(sock, words, user):
         
     # If "!attach" is recieved, process the file and send to the client
     elif words[1] == '!attach':
-        # if words[2] == None or words[3] == None:
-        #     err_msg = f'Error: !attach command is missing filename or followed terms.\n'
-        #     err_msg = err_msg.encode()
-        #     sock.send(err_msg)
+
+        if words[2] == None or words[3] == None:
+            err_msg = f'Error: !attach command is missing filename or followed terms.\n'
+            err_msg = err_msg.encode()
+            sock.send(err_msg)
         try: 
             # Request the file from the client
             file_name = words[2]
             file_request = f'SEND {file_name}\n'
             sock.send(file_request.encode())
-
             # Setup file info to be used to recieve the file
             file_info = get_line_from_socket(sock).split(" ")
             file_size = file_info[0]
@@ -176,7 +176,6 @@ def command_manager(sock, words, user):
             buffer_size = file_info[1]
             buffer_size = int(buffer_size[:-1]) # Remove the "," from the end of the buffer size
             number_of_packets = file_info[2]
-
             # Try building the file from recieved packets, send an error message if the file is not recieved correctly.
             try: 
                 ready_file = ""
@@ -188,6 +187,9 @@ def command_manager(sock, words, user):
                 err_msg = err_msg.encode()
                 sock.send(err_msg)
 
+            # Collect the list of subscribed terms the file was meant to be sent to
+            terms = words[3:]
+
             # Try sending the file to the correct clients, send an error message if the file is not sent correctly.
             try:
                 file_sender = user
@@ -195,26 +197,21 @@ def command_manager(sock, words, user):
                     # Ensure we do not send the file to the sender
                     if reg[0] == file_sender:
                         continue
-                
-                # Collect the list of subscribed terms the file was meant to be sent to
-                terms = words[3:]
+                    for item in dict_of_follow_lists[reg[0]]:
+                        if item in terms:
+                            file_recipient = reg[1]
 
-                for item in dict_of_follow_lists[reg[0]]:
-                    if item in terms:
-                        file_recipient = reg[1]
-                        
-                        # Send file information to the file_recipient so it can build header 
-                        file_info = f'RECEIVE {file_sender} {file_name} {file_size} {buffer_size} {number_of_packets}\n'
-                        file_info.encode()
-                        file_recipient.send(file_info.encode())
-
-                        # Send packets to file_recipient
-                        fakevar = ready_file
-                        while ready_file != "":
-                            packet = fakevar[:buffer_size]
-                            packet = packet.encode()
-                            file_recipient.send(packet)
-                            fakevar = fakevar[buffer_size:]
+                            # Send file information to the file_recipient so it can build header 
+                            file_info = f'RECEIVE {file_sender} {file_name} {file_size} {buffer_size} {number_of_packets}\n'
+                            file_info.encode()
+                            file_recipient.send(file_info.encode())
+                            # Send packets to file_recipient
+                            fakevar = ready_file
+                            while ready_file != "":
+                                packet = fakevar[:buffer_size]
+                                packet = packet.encode()
+                                file_recipient.send(packet)
+                                fakevar = fakevar[buffer_size:]
             except:
                 err_msg = f'Error: File was not sent correctly.\n'
                 err_msg = err_msg.encode()
@@ -309,7 +306,6 @@ def accept_client(sock, mask):
             conn.send(response.encode())
             conn.setblocking(True)
             sel.register(conn, selectors.EVENT_READ, read_message)
-            conn.setblocking(False)
 
         # If user already in list, return a registration error.
 
